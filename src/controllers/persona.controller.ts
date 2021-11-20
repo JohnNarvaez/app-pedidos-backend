@@ -9,10 +9,12 @@ import {
 } from '@loopback/repository';
 import {
   del, get,
-  getModelSchemaRef, param, patch, post, put, requestBody,
+  getModelSchemaRef, HttpErrors, param, patch, post, put, requestBody,
   response
 } from '@loopback/rest';
+import {llaves} from '../config/llaves';
 import {Persona} from '../models';
+import {Credenciales} from '../models/credenciales.model';
 import {PersonaRepository} from '../repositories';
 import {AutenticacionService} from '../services';
 const fetch = require('node-fetch');
@@ -24,6 +26,32 @@ export class PersonaController {
     @service(AutenticacionService)
     public servicioAutenticacion: AutenticacionService
   ) { }
+
+  @post("/identificarPersona", {
+    responses: {
+      '200': {
+        description: "Identificación de usuarios"
+      }
+    }
+  })
+  async identificarPersona(
+    @requestBody() credenciales: Credenciales
+  ) {
+    const p = await this.servicioAutenticacion.IdentificarPersona(credenciales.usuario, credenciales.clave);
+    if (p) {
+      const token = this.servicioAutenticacion.GenerarTokenJWT(p);
+      return {
+        datos: {
+          id: p.id,
+          nombre: p.nombres,
+          correo: p.correo
+        },
+        tk: token
+      }
+    } else {
+      throw new HttpErrors[401]("Datos inválidos");
+    }
+  }
 
   @post('/personas')
   @response(200, {
@@ -53,7 +81,7 @@ export class PersonaController {
     const destino = persona.correo;
     const asunto = 'Registro en la plataforma';
     const contenido = `Hola ${persona.nombres}, su nombre de usuario es: ${persona.correo} y su contraseña es: ${clave}`;
-    fetch(`http://127.0.0.1:5000/envio-correo?correo_destino=${destino}&asunto=${asunto}&contenido=${contenido}`)
+    fetch(`${llaves.urlServicioNotificaciones}/envio-correo?correo_destino=${destino}&asunto=${asunto}&contenido=${contenido}`)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then((data: any) => {
         console.log(data);
